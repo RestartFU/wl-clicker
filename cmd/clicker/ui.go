@@ -158,7 +158,12 @@ func runUI(baseCfg config) error {
 	const maxUILogLines = 50
 	var logMu sync.Mutex
 	logLines := make([]string, 0, maxUILogLines)
+	debugLogs := debugLogsEnabled()
 	appendLogLine := func(line string) {
+		if !debugLogs {
+			return
+		}
+
 		line = strings.TrimSpace(line)
 		if line == "" {
 			return
@@ -572,9 +577,13 @@ func runUI(baseCfg config) error {
 	)
 
 	controlsCard := widget.NewCard("Controls", "", content)
-	logsCard := widget.NewCard("Logs", "", logScroll)
-	split := container.NewVSplit(controlsCard, logsCard)
-	split.SetOffset(0.45)
+	var rootContent fyne.CanvasObject = controlsCard
+	if debugLogs {
+		logsCard := widget.NewCard("Logs", "", logScroll)
+		split := container.NewVSplit(controlsCard, logsCard)
+		split.SetOffset(0.45)
+		rootContent = split
+	}
 
 	setInitializingUI(true, "Status: initializing...")
 	appendLogLine("INFO Initializing input devices...")
@@ -586,7 +595,7 @@ func runUI(baseCfg config) error {
 		return nil
 	})
 
-	window.SetContent(split)
+	window.SetContent(rootContent)
 	window.ShowAndRun()
 	cleanup()
 	return nil

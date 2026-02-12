@@ -67,6 +67,12 @@ func (w *lineSinkWriter) Write(p []byte) (int, error) {
 }
 
 func newSlogLogger(level slog.Level, sink func(line string)) *slog.Logger {
+	if !debugLogsEnabled() {
+		return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
+			Level: level,
+		}))
+	}
+
 	out := io.Writer(os.Stderr)
 	if sink != nil {
 		out = io.MultiWriter(os.Stderr, &lineSinkWriter{sink: sink})
@@ -75,6 +81,10 @@ func newSlogLogger(level slog.Level, sink func(line string)) *slog.Logger {
 	return slog.New(slog.NewTextHandler(out, &slog.HandlerOptions{
 		Level: level,
 	}))
+}
+
+func debugLogsEnabled() bool {
+	return strings.TrimSpace(os.Getenv("DEBUG")) == "1"
 }
 
 func parseLogLevel(value string) (slog.Level, error) {
