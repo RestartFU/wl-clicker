@@ -3,6 +3,7 @@ package autoclicker
 import (
 	"sync"
 	"testing"
+	"time"
 )
 
 type recordingInjector struct {
@@ -119,4 +120,73 @@ func TestStopReleasesLeftButtonBeforeClosingInjector(t *testing.T) {
 		t.Fatalf("expected injector to be closed")
 	}
 	assertReleaseSuffix(t, injector.snapshot())
+}
+
+func TestHandleTriggerEventSignalsWakeOnFirstPressOnly(t *testing.T) {
+	cfg := testConfig(true)
+	cfg.TriggerCode = LeftButtonCode + 2
+	cfg.ToggleCode = cfg.TriggerCode + 1
+
+	service, err := NewService(cfg, &recordingInjector{}, noopLogger{})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	service.handleTriggerEvent("device", 1)
+	select {
+	case <-service.wakeCh:
+	default:
+		t.Fatalf("expected wake signal on first trigger press")
+	}
+
+	service.handleTriggerEvent("device", 2)
+	select {
+	case <-service.wakeCh:
+		t.Fatalf("expected no wake signal for repeat press while already holding")
+	default:
+	}
+
+	service.handleTriggerEvent("device", 0)
+	service.handleTriggerEvent("device", 1)
+	select {
+	case <-service.wakeCh:
+	default:
+		t.Fatalf("expected wake signal after trigger press transition")
+	}
+}
+
+func TestWaitWithWakeReturnsOnSignal(t *testing.T) {
+	cfg := testConfig(true)
+	cfg.TriggerCode = LeftButtonCode + 2
+	cfg.ToggleCode = cfg.TriggerCode + 1
+
+	service, err := NewService(cfg, &recordingInjector{}, noopLogger{})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	done := make(chan time.Duration, 1)
+	go func() {
+		start := time.Now()
+		if !service.waitWithWake(5 * time.Second) {
+			done <- -1
+			return
+		}
+		done <- time.Since(start)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	service.signalWake()
+
+	select {
+	case elapsed := <-done:
+		if elapsed < 0 {
+			t.Fatalf("waitWithWake returned false")
+		}
+		if elapsed > 150*time.Millisecond {
+			t.Fatalf("waitWithWake did not wake promptly: %v", elapsed)
+		}
+	case <-time.After(300 * time.Millisecond):
+		t.Fatalf("timeout waiting for wake")
+	}
 }

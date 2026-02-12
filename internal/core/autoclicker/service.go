@@ -28,6 +28,7 @@ type Service struct {
 
 	pressedSources map[string]struct{}
 	eventsCh       chan sourcedEvent
+	wakeCh         chan struct{}
 	stopCh         chan struct{}
 	stopOnce       sync.Once
 	workersWG      sync.WaitGroup
@@ -53,6 +54,7 @@ func NewService(cfg Config, injector Injector, logger Logger) (*Service, error) 
 		logger:         logger,
 		pressedSources: make(map[string]struct{}),
 		eventsCh:       make(chan sourcedEvent, 256),
+		wakeCh:         make(chan struct{}, 1),
 		stopCh:         make(chan struct{}),
 	}
 	service.intervalNanos.Store(time.Duration(float64(time.Second) / cfg.CPS).Nanoseconds())
@@ -125,7 +127,7 @@ func (s *Service) clickLoop() {
 			return
 		}
 		if !s.enabled.Load() || !s.holding.Load() {
-			if !s.sleepWithStop(200 * time.Millisecond) {
+			if !s.waitForWake() {
 				return
 			}
 			continue
@@ -144,7 +146,7 @@ func (s *Service) clickLoop() {
 
 		interval := s.currentInterval()
 		sleepFor := interval - time.Since(cycleStart)
-		if sleepFor > 0 && !s.sleepWithStop(sleepFor) {
+		if sleepFor > 0 && !s.waitWithWake(sleepFor) {
 			return
 		}
 	}
@@ -194,11 +196,15 @@ func (s *Service) handleTriggerEvent(source string, value int32) {
 		if !s.enabled.Load() {
 			return
 		}
+		wasHolding := len(s.pressedSources) > 0
 		if _, exists := s.pressedSources[source]; !exists {
 			s.logger.Info("Trigger down", "source", source)
 		}
 		s.pressedSources[source] = struct{}{}
 		s.holding.Store(true)
+		if !wasHolding {
+			s.signalWake()
+		}
 		s.maybeNeutralizeLeftHold()
 	case 0:
 		if _, exists := s.pressedSources[source]; exists {
@@ -315,6 +321,38 @@ func (s *Service) stopped() bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func (s *Service) signalWake() {
+	select {
+	case s.wakeCh <- struct{}{}:
+	default:
+	}
+}
+
+func (s *Service) waitForWake() bool {
+	select {
+	case <-s.stopCh:
+		return false
+	case <-s.wakeCh:
+		return true
+	}
+}
+
+func (s *Service) waitWithWake(duration time.Duration) bool {
+	if duration <= 0 {
+		return true
+	}
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-s.stopCh:
+		return false
+	case <-s.wakeCh:
+		return true
+	case <-timer.C:
+		return true
 	}
 }
 
