@@ -20,10 +20,11 @@ type Service struct {
 	injectorMu sync.Mutex
 	stateMu    sync.Mutex
 
-	intervalNanos atomic.Int64
-	clickCount    atomic.Int64
-	enabled       atomic.Bool
-	holding       atomic.Bool
+	intervalNanos  atomic.Int64
+	clickCount     atomic.Int64
+	enabled        atomic.Bool
+	holding        atomic.Bool
+	leftButtonDown atomic.Bool
 
 	pressedSources map[string]struct{}
 	eventsCh       chan sourcedEvent
@@ -71,6 +72,7 @@ func (s *Service) Stop() {
 	s.stopOnce.Do(func() {
 		close(s.stopCh)
 		s.workersWG.Wait()
+		s.releaseLeftButton()
 		_ = s.injector.Close()
 	})
 }
@@ -103,6 +105,7 @@ func (s *Service) SetEnabled(enabled bool) {
 	if !enabled {
 		s.holding.Store(false)
 		clear(s.pressedSources)
+		s.releaseLeftButton()
 		s.logger.Info("Autoclicker disabled")
 		return
 	}
@@ -276,7 +279,11 @@ func (s *Service) clickOnce() bool {
 func (s *Service) writeEvents(events ...Event) error {
 	s.injectorMu.Lock()
 	defer s.injectorMu.Unlock()
-	return s.injector.WriteEvents(events...)
+	if err := s.injector.WriteEvents(events...); err != nil {
+		return err
+	}
+	s.trackLeftButtonState(events)
+	return nil
 }
 
 func (s *Service) isTriggerSource(source string) bool {
@@ -322,5 +329,31 @@ func (s *Service) sleepWithStop(duration time.Duration) bool {
 		return false
 	case <-timer.C:
 		return true
+	}
+}
+
+func (s *Service) trackLeftButtonState(events []Event) {
+	for _, event := range events {
+		if event.Type != EventTypeKey || event.Code != LeftButtonCode {
+			continue
+		}
+		switch event.Value {
+		case 0:
+			s.leftButtonDown.Store(false)
+		case 1, 2:
+			s.leftButtonDown.Store(true)
+		}
+	}
+}
+
+func (s *Service) releaseLeftButton() {
+	if !s.leftButtonDown.Load() {
+		return
+	}
+	if err := s.writeEvents(
+		Event{Type: EventTypeKey, Code: LeftButtonCode, Value: 0},
+		Event{Type: EventTypeSyn, Code: SynReportCode, Value: 0},
+	); err != nil {
+		s.logger.Warn("Failed to release left button", "err", err)
 	}
 }

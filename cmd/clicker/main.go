@@ -20,17 +20,18 @@ import (
 )
 
 type config struct {
-	triggerCode uint16
-	toggleCode  uint16
-	triggerRaw  string
-	toggleRaw   string
-	devicePath  string
-	cps         float64
-	downMS      float64
-	listDevices bool
-	grabDevices bool
-	ui          bool
-	logLevel    slog.Level
+	triggerCode  uint16
+	toggleCode   uint16
+	triggerRaw   string
+	toggleRaw    string
+	devicePath   string
+	cps          float64
+	downMS       float64
+	startEnabled bool
+	listDevices  bool
+	grabDevices  bool
+	ui           bool
+	logLevel     slog.Level
 }
 
 type lineSinkWriter struct {
@@ -119,7 +120,7 @@ func listInputDevices() error {
 }
 
 func parseConfig(args []string) (config, error) {
-	cfg := config{}
+	cfg := config{startEnabled: true}
 	flags := flag.NewFlagSet("clicker", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
 
@@ -209,7 +210,7 @@ func startClickerFromConfig(cfg config, logger *slog.Logger) (*linuxinput.Runtim
 			ToggleCode:   cfg.toggleCode,
 			CPS:          cfg.cps,
 			ClickDown:    clickDown,
-			StartEnabled: true,
+			StartEnabled: cfg.startEnabled,
 			GrabDevices:  cfg.grabDevices,
 		},
 		logger,
@@ -237,7 +238,11 @@ func startClickerFromConfig(cfg config, logger *slog.Logger) (*linuxinput.Runtim
 	if cfg.triggerCode == linuxinput.CodeBTNLeft && !runtime.GrabEnabled() {
 		logger.Warn("BTN_LEFT trigger without grabbing may be ignored by Wayland; use --grab")
 	}
-	logger.Info("Initial state enabled (press toggle to disable/enable)")
+	if cfg.startEnabled {
+		logger.Info("Initial state enabled (press toggle to disable/enable)")
+	} else {
+		logger.Info("Initial state disabled (press toggle to enable/disable)")
+	}
 	logger.Info("Hold trigger to autoclick left mouse button. Press Ctrl+C to stop")
 	return runtime, nil
 }

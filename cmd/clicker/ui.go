@@ -329,19 +329,13 @@ func runUI(baseCfg config) error {
 		if prevClicker != nil {
 			prevEnabled = prevClicker.IsEnabled()
 		}
+		cfg.startEnabled = prevEnabled
+		prevCfg.startEnabled = prevEnabled
 
 		stopRuntime()
 		if err := startRuntime(cfg); err != nil {
-			if restoreErr := startRuntime(prevCfg); restoreErr == nil {
-				if restoredClicker, _, _ := getState(); restoredClicker != nil && !prevEnabled {
-					restoredClicker.SetEnabled(false)
-				}
-			}
+			_ = startRuntime(prevCfg)
 			return err
-		}
-
-		if clicker, _, _ := getState(); clicker != nil && !prevEnabled {
-			clicker.SetEnabled(false)
 		}
 		return nil
 	}
@@ -500,6 +494,7 @@ func runUI(baseCfg config) error {
 	if err != nil {
 		return err
 	}
+	startupCfg.startEnabled = startupEnabled
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
@@ -586,9 +581,6 @@ func runUI(baseCfg config) error {
 	runRuntimeTaskAsync("Status: initializing...", func() error {
 		if err := startRuntime(startupCfg); err != nil {
 			return err
-		}
-		if clicker, _, _ := getState(); clicker != nil && !startupEnabled {
-			clicker.SetEnabled(false)
 		}
 		appendLogLine("INFO Initialization complete")
 		return nil
