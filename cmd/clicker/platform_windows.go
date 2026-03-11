@@ -7,9 +7,24 @@ import (
 	"log/slog"
 	"math"
 	"strings"
+	"syscall"
 	"time"
 
 	"clicker/internal/adapters/wininput"
+
+	"fyne.io/fyne/v2"
+	fynedriver "fyne.io/fyne/v2/driver"
+)
+
+var (
+	windowUser32       = syscall.NewLazyDLL("user32.dll")
+	procReleaseCapture = windowUser32.NewProc("ReleaseCapture")
+	procSendMessageW   = windowUser32.NewProc("SendMessageW")
+)
+
+const (
+	wmNCLButtonDown = 0x00A1
+	htCaption       = 2
 )
 
 func parseTriggerCode(value string) (uint16, error) {
@@ -35,6 +50,23 @@ func captureNextCode(_ string, _ string, timeout time.Duration) (uint16, error) 
 
 func formatCodeName(code uint16) string {
 	return wininput.FormatCodeName(code)
+}
+
+func beginWindowDrag(window fyne.Window) {
+	nativeWindow, ok := window.(fynedriver.NativeWindow)
+	if !ok {
+		return
+	}
+
+	nativeWindow.RunNative(func(context any) {
+		winContext, ok := context.(fynedriver.WindowsWindowContext)
+		if !ok || winContext.HWND == 0 {
+			return
+		}
+
+		_, _, _ = procReleaseCapture.Call()
+		_, _, _ = procSendMessageW.Call(winContext.HWND, uintptr(wmNCLButtonDown), uintptr(htCaption), 0)
+	})
 }
 
 func listInputDevices(_ string) error {

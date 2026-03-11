@@ -14,6 +14,8 @@ import (
 
 	"clicker/internal/adapters/linuxinput"
 	"clicker/internal/adapters/x11input"
+
+	"fyne.io/fyne/v2"
 )
 
 func parseTriggerCode(value string) (uint16, error) {
@@ -44,6 +46,9 @@ func captureNextCode(backend, devicePath string, timeout time.Duration) (uint16,
 
 func formatCodeName(code uint16) string {
 	return linuxinput.FormatCodeName(code)
+}
+
+func beginWindowDrag(fyne.Window) {
 }
 
 func listInputDevices(backend string) error {

@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+
+	"fyne.io/fyne/v2"
 )
 
 func parseTriggerCode(value string) (uint16, error) {
@@ -27,6 +29,9 @@ func captureNextCode(_ string, _ string, timeout time.Duration) (uint16, error) 
 
 func formatCodeName(code uint16) string {
 	return fmt.Sprintf("%d", code)
+}
+
+func beginWindowDrag(fyne.Window) {
 }
 
 func listInputDevices(_ string) error {

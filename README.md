@@ -11,6 +11,34 @@ make build
 
 This creates `./clicker`.
 
+To build a Windows executable:
+
+```bash
+make build-windows
+```
+
+This creates `./clicker.exe`.
+If you want to build for Windows while on Linux, install a MinGW-w64
+cross-compiler first because Fyne's desktop backend depends on cgo.
+
+Arch:
+
+```bash
+sudo pacman -S --needed mingw-w64-gcc
+```
+
+Fedora:
+
+```bash
+sudo dnf install -y mingw64-gcc mingw64-gcc-c++
+```
+
+Debian-based:
+
+```bash
+sudo apt install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
+```
+
 ## Install
 
 ```bash

@@ -2,11 +2,10 @@ module clicker
 
 go 1.25.7
 
-require github.com/holoplot/go-evdev v0.0.0-20250804134636-ab1d56a1fe83
-
 require (
-	github.com/BurntSushi/xgb v0.0.0-20210121224620-deaf085860bc // indirect
-	github.com/BurntSushi/xgbutil v0.0.0-20190907113008-ad855c713046 // indirect
+	github.com/BurntSushi/xgb v0.0.0-20210121224620-deaf085860bc
+	github.com/BurntSushi/xgbutil v0.0.0-20190907113008-ad855c713046
+	github.com/holoplot/go-evdev v0.0.0-20250804134636-ab1d56a1fe83
 )
 
 require (

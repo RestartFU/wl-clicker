@@ -18,6 +18,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -107,6 +108,190 @@ func (t *clickerTheme) Size(name fyne.ThemeSizeName) float32 {
 		return 8
 	}
 	return t.base.Size(name)
+}
+
+type windowDragHandle struct {
+	widget.BaseWidget
+	window fyne.Window
+	text   string
+}
+
+func newWindowDragHandle(window fyne.Window, text string) *windowDragHandle {
+	handle := &windowDragHandle{
+		window: window,
+		text:   text,
+	}
+	handle.ExtendBaseWidget(handle)
+	return handle
+}
+
+func (h *windowDragHandle) CreateRenderer() fyne.WidgetRenderer {
+	label := canvas.NewText(h.text, color.NRGBA{R: 0xff, G: 0x75, B: 0x75, A: 0xff})
+	label.TextStyle = fyne.TextStyle{Bold: true}
+	label.TextSize = 30
+
+	background := canvas.NewRectangle(color.Transparent)
+
+	return &windowDragHandleRenderer{
+		handle:     h,
+		background: background,
+		label:      label,
+		objects:    []fyne.CanvasObject{background, label},
+	}
+}
+
+func (h *windowDragHandle) MinSize() fyne.Size {
+	h.ExtendBaseWidget(h)
+	return h.BaseWidget.MinSize()
+}
+
+func (h *windowDragHandle) MouseDown(event *desktop.MouseEvent) {
+	if event == nil || event.Button != desktop.MouseButtonPrimary {
+		return
+	}
+	beginWindowDrag(h.window)
+}
+
+func (h *windowDragHandle) MouseUp(*desktop.MouseEvent) {
+}
+
+type windowDragHandleRenderer struct {
+	handle     *windowDragHandle
+	background *canvas.Rectangle
+	label      *canvas.Text
+	objects    []fyne.CanvasObject
+}
+
+func (r *windowDragHandleRenderer) Destroy() {
+}
+
+func (r *windowDragHandleRenderer) Layout(size fyne.Size) {
+	r.background.Resize(size)
+
+	labelSize := r.label.MinSize()
+	pad := float32(4)
+	x := pad
+	y := (size.Height - labelSize.Height) / 2
+	if y < 0 {
+		y = 0
+	}
+	r.label.Move(fyne.NewPos(x, y))
+	r.label.Resize(labelSize)
+}
+
+func (r *windowDragHandleRenderer) MinSize() fyne.Size {
+	labelSize := r.label.MinSize()
+	return fyne.NewSize(labelSize.Width+8, labelSize.Height+8)
+}
+
+func (r *windowDragHandleRenderer) Objects() []fyne.CanvasObject {
+	return r.objects
+}
+
+func (r *windowDragHandleRenderer) Refresh() {
+	r.background.Refresh()
+	r.label.Refresh()
+}
+
+type closeButton struct {
+	widget.BaseWidget
+	hovered bool
+	onTap   func()
+}
+
+func newCloseButton(onTap func()) *closeButton {
+	button := &closeButton{onTap: onTap}
+	button.ExtendBaseWidget(button)
+	return button
+}
+
+func (b *closeButton) CreateRenderer() fyne.WidgetRenderer {
+	background := canvas.NewRectangle(color.NRGBA{R: 0x1d, G: 0x23, B: 0x2c, A: 0xff})
+	background.CornerRadius = 8
+
+	label := canvas.NewText("×", color.NRGBA{R: 0xff, G: 0x9c, B: 0x9c, A: 0xff})
+	label.TextStyle = fyne.TextStyle{Bold: true}
+	label.TextSize = 22
+
+	return &closeButtonRenderer{
+		button:     b,
+		background: background,
+		label:      label,
+		objects:    []fyne.CanvasObject{background, label},
+	}
+}
+
+func (b *closeButton) MinSize() fyne.Size {
+	return fyne.NewSize(40, 34)
+}
+
+func (b *closeButton) Tapped(*fyne.PointEvent) {
+	if b.onTap != nil {
+		b.onTap()
+	}
+}
+
+func (b *closeButton) MouseIn(*desktop.MouseEvent) {
+	b.hovered = true
+	b.Refresh()
+}
+
+func (b *closeButton) MouseMoved(*desktop.MouseEvent) {
+}
+
+func (b *closeButton) MouseOut() {
+	b.hovered = false
+	b.Refresh()
+}
+
+func (b *closeButton) Cursor() desktop.Cursor {
+	return desktop.PointerCursor
+}
+
+type closeButtonRenderer struct {
+	button     *closeButton
+	background *canvas.Rectangle
+	label      *canvas.Text
+	objects    []fyne.CanvasObject
+}
+
+func (r *closeButtonRenderer) Destroy() {
+}
+
+func (r *closeButtonRenderer) Layout(size fyne.Size) {
+	r.background.Resize(size)
+
+	labelSize := r.label.MinSize()
+	x := (size.Width - labelSize.Width) / 2
+	y := (size.Height - labelSize.Height) / 2
+	if x < 0 {
+		x = 0
+	}
+	if y < 0 {
+		y = 0
+	}
+	r.label.Move(fyne.NewPos(x, y))
+	r.label.Resize(labelSize)
+}
+
+func (r *closeButtonRenderer) MinSize() fyne.Size {
+	return r.button.MinSize()
+}
+
+func (r *closeButtonRenderer) Objects() []fyne.CanvasObject {
+	return r.objects
+}
+
+func (r *closeButtonRenderer) Refresh() {
+	if r.button.hovered {
+		r.background.FillColor = color.NRGBA{R: 0xff, G: 0x66, B: 0x66, A: 0xff}
+		r.label.Color = color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+	} else {
+		r.background.FillColor = color.NRGBA{R: 0x1d, G: 0x23, B: 0x2c, A: 0xff}
+		r.label.Color = color.NRGBA{R: 0xff, G: 0x9c, B: 0x9c, A: 0xff}
+	}
+	r.background.Refresh()
+	r.label.Refresh()
 }
 
 func normalizeCodeName(raw string, fallback string) string {
@@ -245,8 +430,13 @@ func runUI(baseCfg config) error {
 	fApp.Settings().SetTheme(newClickerTheme())
 
 	window := fApp.NewWindow("Auto-Clicker")
+	if driver, ok := fApp.Driver().(desktop.Driver); ok {
+		window = driver.CreateSplashWindow()
+		window.SetTitle("Auto-Clicker")
+	}
 	window.Resize(fyne.NewSize(760, 470))
 	window.SetFixedSize(true)
+	window.SetPadded(false)
 	window.CenterOnScreen()
 
 	clamp := func(v, min, max float64) float64 {
@@ -866,9 +1056,8 @@ func runUI(baseCfg config) error {
 		window.Close()
 	})
 
-	titleText := canvas.NewText("🗿 CLICKER", color.NRGBA{R: 0xff, G: 0x75, B: 0x75, A: 0xff})
-	titleText.TextStyle = fyne.TextStyle{Bold: true}
-	titleText.TextSize = 30
+	titleHandle := newWindowDragHandle(window, "🗿 CLICKER")
+	closeBtn := newCloseButton(requestQuit)
 
 	accentLine := canvas.NewRectangle(color.NRGBA{R: 0xff, G: 0x66, B: 0x66, A: 0xff})
 	accentLine.SetMinSize(fyne.NewSize(220, 3))
@@ -893,24 +1082,29 @@ func runUI(baseCfg config) error {
 	keybindCard := widget.NewCard("Keybinds", "", keybindControls)
 	controlsRow := container.NewGridWithColumns(2, rateCard, keybindCard)
 
-	mainContent := container.NewVBox(
-		titleText,
+	header := container.NewVBox(
+		container.NewBorder(nil, nil, nil, closeBtn, titleHandle),
 		accentLine,
+	)
+
+	bodyContent := container.NewVBox(
 		controlsRow,
 		currentCPSText,
 		errorText,
 		initProgress,
 		enableToggleBtn,
 	)
-	mainPanel := container.NewPadded(mainContent)
+	mainPanel := container.NewPadded(bodyContent)
 
-	var rootContent fyne.CanvasObject = mainPanel
+	var body fyne.CanvasObject = mainPanel
 	if debugLogs {
 		logsCard := widget.NewCard("Logs", "", logScroll)
 		split := container.NewVSplit(mainPanel, logsCard)
 		split.SetOffset(0.68)
-		rootContent = split
+		body = split
 	}
+
+	rootContent := container.NewBorder(container.NewPadded(header), nil, nil, nil, body)
 
 	setInitializingUI(true)
 	appendLogLine("INFO Initializing input devices...")
